@@ -538,7 +538,7 @@ recipe3 <- recipe(total_bikes ~ ., data = bike_train) %>%
   step_interact(terms = ~ mean_temp:total_rainfall) %>%
   # More selective with polynomial terms
   step_poly(mean_temp, mean_humidity, mean_wind_speed, degree = 2)
-
+   
 # Print the recipe to check steps
 print(recipe3)
 
