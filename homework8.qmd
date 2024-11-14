@@ -1,0 +1,708 @@
+---
+title: "HomeWork8"
+author: "Upendra Joshi"
+format: html
+editor: visual
+---
+
+## Reading the Data 
+
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+library(skimr)
+library(dplyr)
+
+#bike_data <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/SeoulBikeData.csv")
+
+```
+
+As the above code gave the error I found the solution on the google as follows
+
+```{r}
+url <- "https://www4.stat.ncsu.edu/~online/datasets/SeoulBikeData.csv"
+bike_data <- read.csv(url, fileEncoding = "latin1")
+
+# Check the data
+head(bike_data)
+
+```
+Notice: The korean Character in temperature
+Let's check the structure first and then we can clean up the data
+```{r}
+str(bike_data)
+```
+Now we notice a few things that need to be cleaned up:
+
+  1. The temperature columns have Korean characters in their names
+  2. The Date column is in character format
+  3. Some columns should be factors (Seasons, Holiday, Functioning Day)
+
+```{r}
+
+
+# Clean and rename the data
+bike_data_clean <- bike_data %>%
+    rename(
+    date = Date,
+    bike_count = `Rented.Bike.Count`,
+    hour = Hour,
+    temperature = `Temperature..C.`,
+    humidity = `Humidity...`,
+    wind_speed = `Wind.speed..m.s.`,
+    visibility = `Visibility..10m.`,
+    dew_point = `Dew.point.temperature..C.`,
+    solar_radiation = `Solar.Radiation..MJ.m2.`,
+    rainfall = `Rainfall.mm.`,
+    snowfall = `Snowfall..cm.`,
+    seasons = Seasons,
+    holiday = Holiday,
+    functioning_day = `Functioning.Day`
+  )
+ 
+
+```
+
+## EDA
+
+### Checking the Data
+
+  1. Check for missingness: In this first step we should check any missing data from the different         variables.
+  
+```{r}
+# 1. Check for missingness
+missing_summary <- colSums(is.na(bike_data_clean))
+print("Missing values in each column:")
+print(missing_summary)
+
+```
+  We have no missing values in any column of our dataset. This makes our analysis much simpler since we don't need to handle missing data imputation.
+  
+  
+  2. Check the column types and the values within the columns to make sure they make sense (basic
+  summary stats for numeric columns and check the unique values for the categorical variables).
+  
+```{r}
+# 1. First, let's look at the structure of our data
+str(bike_data_clean)
+
+# 2. Summary statistics for numeric columns
+summary(bike_data_clean %>% select_if(is.numeric))
+
+# 3. Unique values for categorical variables
+cat("\nUnique values in Seasons:\n")
+unique(bike_data_clean$seasons)
+
+cat("\nUnique values in Holiday:\n")
+unique(bike_data_clean$holiday)
+
+cat("\nUnique values in Functioning Day:\n")
+unique(bike_data_clean$functioning_day)
+
+# 4. Range checks for numeric variables
+numeric_ranges <- sapply(bike_data_clean %>% select_if(is.numeric), range)
+cat("\nRanges for numeric variables:\n")
+print(numeric_ranges)
+
+# 5. Check if values make sense
+# For example, check if hour is between 0-23
+cat("\nHour range check:", 
+    min(bike_data_clean$hour), "to", max(bike_data_clean$hour))
+
+# Check if humidity is between 0-100
+cat("\nHumidity range check:", 
+    min(bike_data_clean$humidity), "to", max(bike_data_clean$humidity))
+
+# 6. Date range check
+cat("\nDate range:", 
+    min(bike_data_clean$date), "to", max(bike_data_clean$date))
+
+# 7. Frequency table for categorical variables
+cat("\nFrequency table for Seasons:\n")
+table(bike_data_clean$seasons)
+
+cat("\nFrequency table for Holiday:\n")
+table(bike_data_clean$holiday)
+
+cat("\nFrequency table for Functioning Day:\n")
+table(bike_data_clean$functioning_day)
+
+# 8. Check for any impossible values
+impossible_values <- data.frame(
+  negative_bikes = sum(bike_data_clean$bike_count < 0),
+  humidity_over_100 = sum(bike_data_clean$humidity > 100),
+  negative_temp = sum(bike_data_clean$temperature < -50),  # Unreasonable temp
+  negative_wind = sum(bike_data_clean$wind_speed < 0),
+  negative_visibility = sum(bike_data_clean$visibility < 0)
+)
+
+cat("\nCheck for impossible values:\n")
+print(impossible_values)
+```
+
+  Looks good! No impossible values
+  
+  3. Convert the Date column into an actual date (if need be). Recall the `lubridate` package. 
+  
+```{r}
+head(bike_data_clean$date)
+bike_data_clean <- bike_data_clean %>%
+  mutate(date = dmy(date))  # dmy because original format was "DD/MM/YYYY"
+
+# Verify the conversion
+cat("\nClass after conversion:", class(bike_data_clean$date))
+
+# Look at first few dates to verify format
+cat("\n\nFirst few dates:")
+head(bike_data_clean$date)
+```
+  
+  4. Turn the character variables (Seasons, Holiday, and Functioning Day) into factors.
+```{r}
+# 4. Convert character variables to factors
+bike_data_clean <- bike_data_clean %>%
+  mutate(across(c(seasons, holiday, functioning_day), as.factor))
+
+# Verify the conversion
+str(bike_data_clean$seasons)
+str(bike_data_clean$holiday)
+str(bike_data_clean$functioning_day)
+
+# Check unique values in each factor
+cat("\nUnique values in seasons:\n")
+unique(bike_data_clean$seasons)
+
+cat("\nUnique values in holiday:\n")
+unique(bike_data_clean$holiday)
+
+cat("\nUnique values in functioning_day:\n")
+unique(bike_data_clean$functioning_day)
+
+```
+  
+  5. Lastly, rename the all the variables to have easy to use names - This step is already performed.
+  
+  6. Create summary statistics (especially related to the bike rental count). These should be done across
+your categorical variables as well. You should notice something about the Functioning Day variable.
+Subset the data appropriately based on that.
+
+```{r}
+# Overall summary of bike rentals
+cat("Overall bike rental summary:\n")
+summary(bike_data_clean$bike_count)
+
+# Summary by Functioning Day
+cat("\nBike rentals by Functioning Day:\n")
+bike_data_clean %>%
+  group_by(functioning_day) %>%
+  summarise(
+    n = n(),
+    mean_rentals = mean(bike_count),
+    sd_rentals = sd(bike_count),
+    median_rentals = median(bike_count),
+    min_rentals = min(bike_count),
+    max_rentals = max(bike_count)
+  )
+```
+Since there are zero rentals on non-functioning days, we should subset our data to only include functioning days:
+
+```{r}
+# Subset to only functioning days
+bike_data_clean <- bike_data_clean %>%
+  filter(functioning_day == "Yes")
+
+# Verify the subsetting
+cat("Number of observations after filtering:", nrow(bike_data_clean), "\n")
+
+# Now let's look at the summary statistics for our filtered dataset
+bike_summary <- bike_data_clean %>%
+  summarise(
+    n = n(),
+    mean_rentals = mean(bike_count),
+    sd_rentals = sd(bike_count),
+    median_rentals = median(bike_count),
+    min_rentals = min(bike_count),
+    max_rentals = max(bike_count)
+  )
+
+print(bike_summary)
+
+# Let's also look at rentals by season and holiday status in our filtered dataset
+cat("\nBike rentals by season (functioning days only):\n")
+bike_data_clean %>%
+  group_by(seasons) %>%
+  summarise(
+    n = n(),
+    mean_rentals = mean(bike_count),
+    sd_rentals = sd(bike_count),
+    median_rentals = median(bike_count),
+    min_rentals = min(bike_count),
+    max_rentals = max(bike_count)
+  )
+
+cat("\nBike rentals by holiday status (functioning days only):\n")
+bike_data_clean %>%
+  group_by(holiday) %>%
+  summarise(
+    n = n(),
+    mean_rentals = mean(bike_count),
+    sd_rentals = sd(bike_count),
+    median_rentals = median(bike_count),
+    min_rentals = min(bike_count),
+    max_rentals = max(bike_count)
+  )
+```
+  7. To simplify our analysis, we’ll summarize across the hours so that each day has one observation
+associated with it.
+• Let’s group_by() the date, seasons, and holiday variables.
+• Find the sum of the bike_count, rainfall, and snowfall variables
+• Find the mean of all the weather related variables.
+• This will be our new data that we’ll analyze!
+
+
+```{r}
+daily_bike_data <- bike_data_clean %>%
+  group_by(date, seasons, holiday) %>%
+  summarise(
+    # Sum variables
+    total_bikes = sum(bike_count),
+    total_rainfall = sum(rainfall),
+    total_snowfall = sum(snowfall),
+    
+    # Mean of weather variables
+    mean_temp = mean(temperature),
+    mean_humidity = mean(humidity),
+    mean_wind_speed = mean(wind_speed),
+    mean_visibility = mean(visibility),
+    mean_dew_point = mean(dew_point),
+    mean_solar_rad = mean(solar_radiation),
+    .groups = 'drop'  # This drops the grouping after summarise
+  )
+
+# Look at the structure of our new dataset
+str(daily_bike_data)
+
+# View first few rows
+head(daily_bike_data)
+
+# Basic summary statistics of our new daily data
+summary(daily_bike_data)
+
+# Check number of daily observations
+cat("\nNumber of daily observations:", nrow(daily_bike_data))
+
+# Quick summary by season
+daily_bike_data %>%
+  group_by(seasons) %>%
+  summarise(
+    n_days = n(),
+    mean_daily_rentals = mean(total_bikes),
+    sd_daily_rentals = sd(total_bikes)
+  )
+```
+
+Let's analyze this data in detail
+We can check the correlation between numeric columns
+We can plot the graphs of day rental vs seasons
+
+```{r}
+# 1. Basic Summary Statistics
+cat("Basic Summary Statistics:\n")
+summary(daily_bike_data)
+
+# 2. Summary by Season
+cat("\nSummary by Season:\n")
+daily_bike_data %>%
+  group_by(seasons) %>%
+  summarise(
+    n_days = n(),
+    mean_rentals = mean(total_bikes),
+    sd_rentals = sd(total_bikes),
+    min_rentals = min(total_bikes),
+    max_rentals = max(total_bikes)
+  )
+
+# 3. Summary by Holiday Status
+cat("\nSummary by Holiday Status:\n")
+daily_bike_data %>%
+  group_by(holiday) %>%
+  summarise(
+    n_days = n(),
+    mean_rentals = mean(total_bikes),
+    sd_rentals = sd(total_bikes),
+    min_rentals = min(total_bikes),
+    max_rentals = max(total_bikes)
+  )
+
+# 4. Correlation Analysis
+# Select numeric columns
+numeric_cols <- daily_bike_data %>%
+  select(total_bikes, total_rainfall, total_snowfall, 
+         mean_temp, mean_humidity, mean_wind_speed, 
+         mean_visibility, mean_dew_point, mean_solar_rad)
+
+# Calculate correlations
+correlations <- cor(numeric_cols)
+
+# Print correlations with total_bikes
+cat("\nCorrelations with total_bikes:\n")
+sort(correlations[1,], decreasing = TRUE)
+
+# 5. Create plots
+library(ggplot2)
+
+# Plot 1: Daily rentals over time
+ggplot(daily_bike_data, aes(x = date, y = total_bikes)) +
+  geom_line() +
+  labs(title = "Daily Bike Rentals Over Time",
+       x = "Date",
+       y = "Total Rentals") +
+  theme_minimal()
+
+# Plot 2: Box plot of rentals by season
+ggplot(daily_bike_data, aes(x = seasons, y = total_bikes, fill = seasons)) +
+  geom_boxplot() +
+  labs(title = "Bike Rentals by Season",
+       x = "Season",
+       y = "Total Rentals") +
+  theme_minimal()
+
+# Plot 3: Scatter plot of temperature vs rentals
+ggplot(daily_bike_data, aes(x = mean_temp, y = total_bikes)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess") +
+  labs(title = "Temperature vs Bike Rentals",
+       x = "Mean Temperature (°C)",
+       y = "Total Rentals") +
+  theme_minimal()
+
+# Plot 4: Rentals vs rainfall
+ggplot(daily_bike_data, aes(x = total_rainfall, y = total_bikes)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess") +
+  labs(title = "Rainfall vs Bike Rentals",
+       x = "Total Rainfall (mm)",
+       y = "Total Rentals") +
+  theme_minimal()
+```
+
+### Split the Data
+
+  • Use functions from tidymodels to split the data into a training and test set (75/25 split). Use the
+    strata argument to stratify the split on the seasons variable.
+  • On the training set, create a 10 fold CV split
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Create initial split (75/25) stratified by seasons
+bike_split <- initial_split(daily_bike_data, prop = 0.75, strata = seasons)
+
+# Create training and testing sets
+bike_train <- training(bike_split)
+bike_test <- testing(bike_split)
+
+# Create 10-fold CV split on training data
+bike_folds <- vfold_cv(bike_train, v = 10, strata = seasons)
+
+# Check the dimensions of our splits
+cat("Dimensions of datasets:\n")
+cat("Full data:", nrow(daily_bike_data), "rows\n")
+cat("Training set:", nrow(bike_train), "rows\n")
+cat("Testing set:", nrow(bike_test), "rows\n")
+
+# Verify stratification by checking proportion of seasons in each set
+cat("\nProportion of seasons in full dataset:\n")
+prop.table(table(daily_bike_data$seasons))
+
+cat("\nProportion of seasons in training set:\n")
+prop.table(table(bike_train$seasons))
+
+cat("\nProportion of seasons in testing set:\n")
+prop.table(table(bike_test$seasons))
+
+# Check the structure of the CV folds
+bike_folds
+```
+
+## Fitting MLR Models
+
+First, let’s create some recipes.
+For the 1st recipe:
+  • Let’s ignore the date variable for modeling (so we’ll need to remove that or give it a different ID)     but use it to create a weekday/weekend (factor) variable. (See step 2 of the shinymodels tutorial!       You can use step_date() then step_mutate() with a factor(if_else(...)) to create the variable. I
+    then had to remove the intermediate variable created.)
+  • Let’s standardize the numeric variables since their scales are pretty different.
+  • Let’s create dummy variables for the seasons, holiday, and our new day type variable
+  
+```{r}
+# Create first recipe
+recipe1 <- recipe(total_bikes ~ ., data = bike_train) %>%
+ # Create weekday/weekend variable from date
+ step_date(date, features = "dow") %>%
+ step_mutate(
+   day_type = factor(if_else(
+     date_dow %in% c("Sat", "Sun"), 
+     "weekend", 
+     "weekday"
+   ))
+ ) %>%
+ # Remove the intermediate dow variable and date
+ step_rm(date_dow, date) %>%
+ # Standardize numeric variables
+ step_normalize(all_numeric_predictors()) %>%
+ # Create dummy variables
+ step_dummy(all_nominal_predictors())
+
+# Print the recipe to check steps
+print(recipe1)
+
+# Check if recipe works by prepping it
+prep(recipe1) %>%
+ bake(new_data = NULL) %>%
+ glimpse()
+```
+
+
+For the 2nd recipe:
+• Do the same steps as above.
+• Add in interactions between seasons and holiday, seasons and temp, temp and rainfall. For the seasons
+interactions, you can use starts_with() to create the proper interactions.
+```{r}
+# Create second recipe
+recipe2 <- recipe(total_bikes ~ ., data = bike_train) %>%
+  step_date(date, features = "dow") %>%
+  step_mutate(
+    day_type = factor(if_else(
+      date_dow %in% c("Sat", "Sun"), 
+      "weekend", 
+      "weekday"
+    ))
+  ) %>%
+  step_rm(date_dow, date) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%  # Changed to one_hot encoding
+  # Simplified interactions
+  step_interact(terms = ~ mean_temp:total_rainfall)%>%
+  # Handle rank deficiency
+  step_zv(all_predictors())
+
+# Print the recipe to check steps
+print(recipe2)
+
+# Check if recipe works and examine the results
+prep(recipe2) %>%
+ bake(new_data = NULL) %>%
+ glimpse()
+
+# Check names of interaction terms
+processed_data2 <- prep(recipe2) %>%
+ bake(new_data = NULL)
+
+cat("\nInteraction terms created:\n")
+names(processed_data2)[grep("_x_", names(processed_data2))]
+```
+
+This recipe includes:
+
+All transformations from recipe1
+Interactions between:
+
+1. Seasons dummy variables and holiday
+2. Seasons dummy variables and mean temperature
+3. Mean temperature and total rainfall
+
+
+For the 3rd recipe:
+• Do the same as the 2nd recipe.
+• Add in quadratic terms for each numeric predictor
+
+```{r}
+# Create third recipe
+recipe3 <- recipe(total_bikes ~ ., data = bike_train) %>%
+  step_date(date, features = "dow") %>%
+  step_mutate(
+    day_type = factor(if_else(
+      date_dow %in% c("Sat", "Sun"), 
+      "weekend", 
+      "weekday"
+    ))
+  ) %>%
+  step_rm(date_dow, date) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%  # Changed to one_hot encoding
+  step_interact(terms = ~ mean_temp:total_rainfall) %>%
+  # More selective with polynomial terms
+  step_poly(mean_temp, mean_humidity, mean_wind_speed, degree = 2)
+
+# Print the recipe to check steps
+print(recipe3)
+
+# Check if recipe works and examine the results
+processed_data3 <- prep(recipe3) %>%
+ bake(new_data = NULL)
+
+# Look at the structure
+glimpse(processed_data3)
+
+# Check names of quadratic terms
+cat("\nQuadratic terms created:\n")
+names(processed_data3)[grep("_2$", names(processed_data3))]
+```
+
+This recipe includes:
+
+All transformations from recipe2
+Quadratic terms (squared terms) for all numeric predictors:
+
+total_rainfall
+mean_temp
+mean_humidity
+mean_wind_speed
+mean_visibility
+mean_dew_point
+mean_solar_rad
+total_snowfall
+
+Each numeric variable will now have both its linear and quadratic term, allowing for curved relationships with the response variable.
+
+Now set up our linear model fit to use the “lm” engine.
+Fit the models using 10 fold CV via fit_resamples() and consider the training set CV error to choose a
+best model.
+
+```{r}
+# Set up linear model with lm engine
+lm_model <- linear_reg() %>%
+ set_engine("lm")
+
+# Create workflows for each recipe
+workflow1 <- workflow() %>%
+ add_recipe(recipe1) %>%
+ add_model(lm_model)
+
+workflow2 <- workflow() %>%
+ add_recipe(recipe2) %>%
+ add_model(lm_model)
+
+workflow3 <- workflow() %>%
+ add_recipe(recipe3) %>%
+ add_model(lm_model)
+
+# Fit models using 10-fold CV
+set.seed(123)  # for reproducibility
+
+# Fit model 1
+cv_results1 <- workflow1 %>%
+ fit_resamples(
+   resamples = bike_folds,
+   metrics = metric_set(rmse, rsq, mae)
+ )
+
+# Fit model 2
+cv_results2 <- workflow2 %>%
+ fit_resamples(
+   resamples = bike_folds,
+   metrics = metric_set(rmse, rsq, mae),
+   control = control_resamples(save_pred = TRUE)
+ )
+
+# Fit model 3
+cv_results3 <- workflow3 %>%
+ fit_resamples(
+   resamples = bike_folds,
+   metrics = metric_set(rmse, rsq, mae),
+   control = control_resamples(save_pred = TRUE)
+ )
+
+# Collect and compare CV results
+cat("Model 1 CV Results:\n")
+collect_metrics(cv_results1)
+
+cat("\nModel 2 CV Results:\n")
+collect_metrics(cv_results2)
+
+cat("\nModel 3 CV Results:\n")
+collect_metrics(cv_results3)
+
+# Compare models side by side
+
+combined_results <- bind_rows(
+  collect_metrics(cv_results1) %>% mutate(model = "Model 1"),
+  collect_metrics(cv_results2) %>% mutate(model = "Model 2"),
+  collect_metrics(cv_results3) %>% mutate(model = "Model 3")
+)
+
+# Calculate the mean of each metric for each model
+model_comparison <- combined_results %>%
+  group_by(model, .metric) %>%
+  summarise(mean = mean(mean, na.rm = TRUE)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = .metric, values_from = mean) %>%
+  select(model, mae, rmse, rsq)
+
+# Print the model comparison
+print(model_comparison)
+```
+
+Based on the cross-validation results:
+
+Model 3 has the lowest Mean Absolute Error (MAE) of 3057.225, indicating that, on average, the predicted values deviate from the actual values by approximately 3057.225 units. Lower MAE values are generally preferred.
+Model 3 also has the lowest Root Mean Squared Error (RMSE) of 3869.794, suggesting that it has the smallest average magnitude of the residuals (prediction errors). RMSE is more sensitive to large errors compared to MAE.
+Model 3 has the highest R-squared value of 0.8504317, indicating that approximately 85.04% of the variance in the target variable can be explained by the predictors in Model 3. Higher R-squared values indicate better model fit.
+
+Considering all three metrics, Model 3 appears to have the best performance among the three models. It has the lowest MAE and RMSE, suggesting better predictive accuracy, and the highest R-squared value, indicating a better fit to the data
+
+To fit Model 3 on the entire training set, compute the test set RMSE, and extract the model coefficients
+
+```{r}
+# Fit best model on entire dataset
+final_fit <- last_fit(
+  workflow3,  
+  split = bike_split,
+  metrics = metric_set(rmse, rsq)
+)
+
+# Extract test metrics
+collect_metrics(final_fit)
+
+# Extract coefficients
+final_coef <- final_fit %>%
+  extract_fit_parsnip() %>%
+  tidy()
+
+print("Final model coefficients:")
+print(final_coef)
+```
+
+The model coefficients provide valuable insights into how each predictor affects the total number of bikes, holding all other predictors constant. Here are some key takeaways:
+
+Intercept: The intercept represents the predicted number of bikes when all predictors are zero (for standardized numeric predictors) or at their reference level (for categorical predictors). In this case, the intercept is 13921.39 bikes.
+Weather variables:
+
+`total_rainfall`: A one standard deviation increase in total rainfall is associated with a decrease of 2151.76 bikes, on average. This effect is statistically significant (p < 0.001).
+`mean_solar_rad`: A one standard deviation increase in mean solar radiation is associated with an increase of 4087.83 bikes, on average. This effect is highly statistically significant (p < 0.001).
+`mean_dew_point`: A one standard deviation increase in mean dew point is associated with an increase of 17685.19 bikes, on average. This effect is statistically significant (p < 0.01).
+
+Seasonal and day type effects:
+
+Compared to Winter (the reference level), Autumn is associated with an increase of 4974.21 bikes (p < 0.001), while Summer is associated with an increase of 3268.20 bikes (p < 0.05). The effect of Spring is not statistically significant.
+Weekdays are associated with an increase of 2364.97 bikes compared to weekends (p < 0.001).
+
+Interaction and polynomial terms:
+
+The interaction between mean temperature and total rainfall is not statistically significant.
+The quadratic terms for mean temperature and mean humidity are statistically significant (p < 0.001 and p < 0.05, respectively), indicating a non-linear relationship between these predictors and the total number of bikes.
+
+Non-significant predictors:
+
+`total_snowfall`, `mean_visibility`, and the polynomial terms for `mean_wind_speed` are not statistically significant, suggesting they may not be important predictors of the total number of bikes in this model.
+
+
+
+
+
+
