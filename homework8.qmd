@@ -5,10 +5,8 @@ format: html
 editor: visual
 ---
 
-## Reading the Data 
-
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Reading the Data
+Let's read the data
 
 ```{r}
 library(tidyverse)
@@ -31,16 +29,18 @@ bike_data <- read.csv(url, fileEncoding = "latin1")
 head(bike_data)
 
 ```
-Notice: The korean Character in temperature
-Let's check the structure first and then we can clean up the data
+
+Notice: The korean Character in temperature Let's check the structure first and then we can clean up the data
+
 ```{r}
 str(bike_data)
 ```
+
 Now we notice a few things that need to be cleaned up:
 
-  1. The temperature columns have Korean characters in their names
-  2. The Date column is in character format
-  3. Some columns should be factors (Seasons, Holiday, Functioning Day)
+1.  The temperature columns have Korean characters in their names
+2.  The Date column is in character format
+3.  Some columns should be factors (Seasons, Holiday, Functioning Day)
 
 ```{r}
 
@@ -71,8 +71,8 @@ bike_data_clean <- bike_data %>%
 
 ### Checking the Data
 
-  1. Check for missingness: In this first step we should check any missing data from the different         variables.
-  
+1.  Check for missingness: In this first step we should check any missing data from the different variables.
+
 ```{r}
 # 1. Check for missingness
 missing_summary <- colSums(is.na(bike_data_clean))
@@ -80,12 +80,11 @@ print("Missing values in each column:")
 print(missing_summary)
 
 ```
-  We have no missing values in any column of our dataset. This makes our analysis much simpler since we don't need to handle missing data imputation.
-  
-  
-  2. Check the column types and the values within the columns to make sure they make sense (basic
-  summary stats for numeric columns and check the unique values for the categorical variables).
-  
+
+We have no missing values in any column of our dataset. This makes our analysis much simpler since we don't need to handle missing data imputation.
+
+2.  Check the column types and the values within the columns to make sure they make sense (basic summary stats for numeric columns and check the unique values for the categorical variables).
+
 ```{r}
 # 1. First, let's look at the structure of our data
 str(bike_data_clean)
@@ -144,10 +143,10 @@ cat("\nCheck for impossible values:\n")
 print(impossible_values)
 ```
 
-  Looks good! No impossible values
-  
-  3. Convert the Date column into an actual date (if need be). Recall the `lubridate` package. 
-  
+Looks good! No impossible values
+
+3.  Convert the Date column into an actual date (if need be). Recall the `lubridate` package.
+
 ```{r}
 head(bike_data_clean$date)
 bike_data_clean <- bike_data_clean %>%
@@ -160,8 +159,9 @@ cat("\nClass after conversion:", class(bike_data_clean$date))
 cat("\n\nFirst few dates:")
 head(bike_data_clean$date)
 ```
-  
-  4. Turn the character variables (Seasons, Holiday, and Functioning Day) into factors.
+
+4.  Turn the character variables (Seasons, Holiday, and Functioning Day) into factors.
+
 ```{r}
 # 4. Convert character variables to factors
 bike_data_clean <- bike_data_clean %>%
@@ -183,12 +183,10 @@ cat("\nUnique values in functioning_day:\n")
 unique(bike_data_clean$functioning_day)
 
 ```
-  
-  5. Lastly, rename the all the variables to have easy to use names - This step is already performed.
-  
-  6. Create summary statistics (especially related to the bike rental count). These should be done across
-your categorical variables as well. You should notice something about the Functioning Day variable.
-Subset the data appropriately based on that.
+
+5.  Lastly, rename the all the variables to have easy to use names - This step is already performed.
+
+6.  Create summary statistics (especially related to the bike rental count). These should be done across your categorical variables as well. You should notice something about the Functioning Day variable. Subset the data appropriately based on that.
 
 ```{r}
 # Overall summary of bike rentals
@@ -208,6 +206,7 @@ bike_data_clean %>%
     max_rentals = max(bike_count)
   )
 ```
+
 Since there are zero rentals on non-functioning days, we should subset our data to only include functioning days:
 
 ```{r}
@@ -256,13 +255,8 @@ bike_data_clean %>%
     max_rentals = max(bike_count)
   )
 ```
-  7. To simplify our analysis, we’ll summarize across the hours so that each day has one observation
-associated with it.
-• Let’s group_by() the date, seasons, and holiday variables.
-• Find the sum of the bike_count, rainfall, and snowfall variables
-• Find the mean of all the weather related variables.
-• This will be our new data that we’ll analyze!
 
+7.  To simplify our analysis, we’ll summarize across the hours so that each day has one observation associated with it. • Let’s group_by() the date, seasons, and holiday variables. • Find the sum of the bike_count, rainfall, and snowfall variables • Find the mean of all the weather related variables. • This will be our new data that we’ll analyze!
 
 ```{r}
 daily_bike_data <- bike_data_clean %>%
@@ -305,9 +299,7 @@ daily_bike_data %>%
   )
 ```
 
-Let's analyze this data in detail
-We can check the correlation between numeric columns
-We can plot the graphs of day rental vs seasons
+Let's analyze this data in detail We can check the correlation between numeric columns We can plot the graphs of day rental vs seasons
 
 ```{r}
 # 1. Basic Summary Statistics
@@ -392,9 +384,7 @@ ggplot(daily_bike_data, aes(x = total_rainfall, y = total_bikes)) +
 
 ### Split the Data
 
-  • Use functions from tidymodels to split the data into a training and test set (75/25 split). Use the
-    strata argument to stratify the split on the seasons variable.
-  • On the training set, create a 10 fold CV split
+• Use functions from tidymodels to split the data into a training and test set (75/25 split). Use the strata argument to stratify the split on the seasons variable. • On the training set, create a 10 fold CV split
 
 ```{r}
 # Set seed for reproducibility
@@ -432,13 +422,8 @@ bike_folds
 
 ## Fitting MLR Models
 
-First, let’s create some recipes.
-For the 1st recipe:
-  • Let’s ignore the date variable for modeling (so we’ll need to remove that or give it a different ID)     but use it to create a weekday/weekend (factor) variable. (See step 2 of the shinymodels tutorial!       You can use step_date() then step_mutate() with a factor(if_else(...)) to create the variable. I
-    then had to remove the intermediate variable created.)
-  • Let’s standardize the numeric variables since their scales are pretty different.
-  • Let’s create dummy variables for the seasons, holiday, and our new day type variable
-  
+First, let’s create some recipes. For the 1st recipe: • Let’s ignore the date variable for modeling (so we’ll need to remove that or give it a different ID) but use it to create a weekday/weekend (factor) variable. (See step 2 of the shinymodels tutorial! You can use step_date() then step_mutate() with a factor(if_else(...)) to create the variable. I then had to remove the intermediate variable created.) • Let’s standardize the numeric variables since their scales are pretty different. • Let’s create dummy variables for the seasons, holiday, and our new day type variable
+
 ```{r}
 # Create first recipe
 recipe1 <- recipe(total_bikes ~ ., data = bike_train) %>%
@@ -467,11 +452,8 @@ prep(recipe1) %>%
  glimpse()
 ```
 
+For the 2nd recipe: • Do the same steps as above. • Add in interactions between seasons and holiday, seasons and temp, temp and rainfall. For the seasons interactions, you can use starts_with() to create the proper interactions.
 
-For the 2nd recipe:
-• Do the same steps as above.
-• Add in interactions between seasons and holiday, seasons and temp, temp and rainfall. For the seasons
-interactions, you can use starts_with() to create the proper interactions.
 ```{r}
 # Create second recipe
 recipe2 <- recipe(total_bikes ~ ., data = bike_train) %>%
@@ -509,17 +491,13 @@ names(processed_data2)[grep("_x_", names(processed_data2))]
 
 This recipe includes:
 
-All transformations from recipe1
-Interactions between:
+All transformations from recipe1 Interactions between:
 
-1. Seasons dummy variables and holiday
-2. Seasons dummy variables and mean temperature
-3. Mean temperature and total rainfall
+1.  Seasons dummy variables and holiday
+2.  Seasons dummy variables and mean temperature
+3.  Mean temperature and total rainfall
 
-
-For the 3rd recipe:
-• Do the same as the 2nd recipe.
-• Add in quadratic terms for each numeric predictor
+For the 3rd recipe: • Do the same as the 2nd recipe. • Add in quadratic terms for each numeric predictor
 
 ```{r}
 # Create third recipe
@@ -556,23 +534,13 @@ names(processed_data3)[grep("_2$", names(processed_data3))]
 
 This recipe includes:
 
-All transformations from recipe2
-Quadratic terms (squared terms) for all numeric predictors:
+All transformations from recipe2 Quadratic terms (squared terms) for all numeric predictors:
 
-total_rainfall
-mean_temp
-mean_humidity
-mean_wind_speed
-mean_visibility
-mean_dew_point
-mean_solar_rad
-total_snowfall
+total_rainfall mean_temp mean_humidity mean_wind_speed mean_visibility mean_dew_point mean_solar_rad total_snowfall
 
 Each numeric variable will now have both its linear and quadratic term, allowing for curved relationships with the response variable.
 
-Now set up our linear model fit to use the “lm” engine.
-Fit the models using 10 fold CV via fit_resamples() and consider the training set CV error to choose a
-best model.
+Now set up our linear model fit to use the “lm” engine. Fit the models using 10 fold CV via fit_resamples() and consider the training set CV error to choose a best model.
 
 ```{r}
 # Set up linear model with lm engine
@@ -650,9 +618,7 @@ print(model_comparison)
 
 Based on the cross-validation results:
 
-Model 3 has the lowest Mean Absolute Error (MAE) of 3057.225, indicating that, on average, the predicted values deviate from the actual values by approximately 3057.225 units. Lower MAE values are generally preferred.
-Model 3 also has the lowest Root Mean Squared Error (RMSE) of 3869.794, suggesting that it has the smallest average magnitude of the residuals (prediction errors). RMSE is more sensitive to large errors compared to MAE.
-Model 3 has the highest R-squared value of 0.8504317, indicating that approximately 85.04% of the variance in the target variable can be explained by the predictors in Model 3. Higher R-squared values indicate better model fit.
+Model 3 has the lowest Mean Absolute Error (MAE) of 3057.225, indicating that, on average, the predicted values deviate from the actual values by approximately 3057.225 units. Lower MAE values are generally preferred. Model 3 also has the lowest Root Mean Squared Error (RMSE) of 3869.794, suggesting that it has the smallest average magnitude of the residuals (prediction errors). RMSE is more sensitive to large errors compared to MAE. Model 3 has the highest R-squared value of 0.8504317, indicating that approximately 85.04% of the variance in the target variable can be explained by the predictors in Model 3. Higher R-squared values indicate better model fit.
 
 Considering all three metrics, Model 3 appears to have the best performance among the three models. It has the lowest MAE and RMSE, suggesting better predictive accuracy, and the highest R-squared value, indicating a better fit to the data
 
@@ -680,31 +646,18 @@ print(final_coef)
 
 The model coefficients provide valuable insights into how each predictor affects the total number of bikes, holding all other predictors constant. Here are some key takeaways:
 
-Intercept: The intercept represents the predicted number of bikes when all predictors are zero (for standardized numeric predictors) or at their reference level (for categorical predictors). In this case, the intercept is 13921.39 bikes.
-Weather variables:
+Intercept: The intercept represents the predicted number of bikes when all predictors are zero (for standardized numeric predictors) or at their reference level (for categorical predictors). In this case, the intercept is 13921.39 bikes. Weather variables:
 
-`total_rainfall`: A one standard deviation increase in total rainfall is associated with a decrease of 2151.76 bikes, on average. This effect is statistically significant (p < 0.001).
-`mean_solar_rad`: A one standard deviation increase in mean solar radiation is associated with an increase of 4087.83 bikes, on average. This effect is highly statistically significant (p < 0.001).
-`mean_dew_point`: A one standard deviation increase in mean dew point is associated with an increase of 17685.19 bikes, on average. This effect is statistically significant (p < 0.01).
+`total_rainfall`: A one standard deviation increase in total rainfall is associated with a decrease of 2151.76 bikes, on average. This effect is statistically significant (p \< 0.001). `mean_solar_rad`: A one standard deviation increase in mean solar radiation is associated with an increase of 4087.83 bikes, on average. This effect is highly statistically significant (p \< 0.001). `mean_dew_point`: A one standard deviation increase in mean dew point is associated with an increase of 17685.19 bikes, on average. This effect is statistically significant (p \< 0.01).
 
 Seasonal and day type effects:
 
-Compared to Winter (the reference level), Autumn is associated with an increase of 4974.21 bikes (p < 0.001), while Summer is associated with an increase of 3268.20 bikes (p < 0.05). The effect of Spring is not statistically significant.
-Weekdays are associated with an increase of 2364.97 bikes compared to weekends (p < 0.001).
+Compared to Winter (the reference level), Autumn is associated with an increase of 4974.21 bikes (p \< 0.001), while Summer is associated with an increase of 3268.20 bikes (p \< 0.05). The effect of Spring is not statistically significant. Weekdays are associated with an increase of 2364.97 bikes compared to weekends (p \< 0.001).
 
 Interaction and polynomial terms:
 
-The interaction between mean temperature and total rainfall is not statistically significant.
-The quadratic terms for mean temperature and mean humidity are statistically significant (p < 0.001 and p < 0.05, respectively), indicating a non-linear relationship between these predictors and the total number of bikes.
+The interaction between mean temperature and total rainfall is not statistically significant. The quadratic terms for mean temperature and mean humidity are statistically significant (p \< 0.001 and p \< 0.05, respectively), indicating a non-linear relationship between these predictors and the total number of bikes.
 
 Non-significant predictors:
 
 `total_snowfall`, `mean_visibility`, and the polynomial terms for `mean_wind_speed` are not statistically significant, suggesting they may not be important predictors of the total number of bikes in this model.
-
-
-
-
-
-
-
-
